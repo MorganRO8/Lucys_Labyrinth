@@ -3,7 +3,7 @@
 A game made for a school project, dedicated to my daughter.
 
 
-![intro screen]([https://github.com/MorganRO8/Lucys_Labyrinth/blob/master/textures/startup_screen.png?raw=true])
+![intro screen](textures/startup_screen.png)
 
 
 ## The Game
