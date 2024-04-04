@@ -3,6 +3,9 @@
 A game made for a school project, dedicated to my daughter.
 
 
+![alt text]([http://url/to/img.png](https://github.com/MorganRO8/Lucys_Labyrinth/blob/34c4d62a1f34fddfc4fcd41c8aac86b33f7ec911/textures/startup_screen.png))
+
+
 ## The Game
 
 You play as Lucy, in a labyrinth of truth and lies.
