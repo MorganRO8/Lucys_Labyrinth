@@ -937,7 +937,7 @@ int main() {
         return 1;
     }
     music.setLoop(true);
-    sf::SoundBuffer doorFailedBuffer;  
+    sf::SoundBuffer doorFailedBuffer;
     sf::SoundBuffer doorLeavingBuffer;
     sf::SoundBuffer doorOpenBuffer;
     sf::SoundBuffer winBuffer;
@@ -1050,11 +1050,17 @@ int main() {
             maze.gameView.setViewport(sf::FloatRect(0, viewY / windowSize.y, 1, viewHeight / windowSize.y));
         }
 
-        if (!music.getStatus() == sf::Music::Playing && maze.dialogueBoxState != 5 && maze.dialogueBoxState != 6) {
+        if (music.getStatus() != sf::Music::Playing && ((maze.dialogueBoxState != 5 && maze.dialogueBoxState != 6) || maze.getDialogueBoxDisplayed() == false)) {
             music.play();
         }
         else if ((maze.dialogueBoxState == 5 || maze.dialogueBoxState == 6) && music.getStatus() == sf::Music::Playing) {
             music.stop();
+            if (maze.dialogueBoxState == 5) {
+                winSound.play();
+            }
+            else if (maze.dialogueBoxState == 6) {
+                loseSound.play();
+            }
         }
 
         int doorRow = maze.playerRow, doorCol = maze.playerCol;
@@ -1070,16 +1076,17 @@ int main() {
             if (maze.everythingShown == false) {
                 maze.exploreAdjacentCells();
                 maze.everythingShown == true;
-            } 
+            }
             maze.showFailureScreen(window);
         }
-
         sf::Event event;
         while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
+            if (event.type == sf::Event::Closed) {
                 window.close();
-            else if (event.type == sf::Event::KeyPressed && maze.startupScreenDisplayed)
+            }
+            else if (event.type == sf::Event::KeyPressed && maze.startupScreenDisplayed) {
                 maze.startupScreenDisplayed = false;
+            }
             else if (event.type == sf::Event::MouseButtonPressed) {
                 if (maze.getDialogueBoxDisplayed()) {
                     sf::Vector2i mousePos = sf::Mouse::getPosition(window);
@@ -1116,7 +1123,6 @@ int main() {
                         }
                     }
                     else if (maze.dialogueBoxState == 4) {
-
                         clickInsideButton = false;
 
                         sf::FloatRect liarBounds((viewSize.x + 100) / 2.0f, dialogueBoxPosition.y + 270, 50, 30);
@@ -1125,19 +1131,13 @@ int main() {
                         if (liarBounds.contains(mousePosF.x, mousePosF.y)) {
                             playerGuess = true;
                             clickInsideButton = true;
-                            //cout << "Player guessed liar" << endl;
                         }
                         else if (honestBounds.contains(mousePosF.x, mousePosF.y)) {
                             playerGuess = false;
                             clickInsideButton = true;
-                            //cout << "Player guessed honest" << endl;
                         }
 
                         if (clickInsideButton == true) {
-
-                            //cout << "Player Guessed:" << playerGuess << endl;
-                            //cout << "Door state: " << maze.grid[doorRow][doorCol].second.second.second.first << endl;
-
                             if (playerGuess == maze.grid[doorRow][doorCol].second.second.second.first) {
                                 sf::Text correctText;
                                 correctText.setFont(font);
@@ -1172,7 +1172,61 @@ int main() {
                         sf::FloatRect playAgainBounds((viewSize.x - 250) / 2.0f, dialogueBoxPosition.y + 270, 100, 30);
                         sf::FloatRect exitBounds((viewSize.x + 100) / 2.0f, dialogueBoxPosition.y + 270, 50, 30);
 
-                        winSound.play();
+                        if (playAgainBounds.contains(mousePosF.x, mousePosF.y)) {
+                            // Restart the game
+                            srand(static_cast<unsigned int>(std::time(0)));
+                            maze = Maze();
+
+                            // Search for the first .gguf file in the "model" directory
+                            std::string modelPath;
+                            for (const auto& entry : std::filesystem::directory_iterator("./model")) {
+                                if (entry.path().extension() == ".gguf") {
+                                    modelPath = entry.path().string();
+                                    break;
+                                }
+                            }
+
+                            if (modelPath.empty()) {
+                                std::cout << "Error: no .gguf model file found in the 'model' directory" << std::endl;
+                                return 1;
+                            }
+
+                            // Load the model
+                            maze.model = llama_load_model_from_file(modelPath.c_str(), model_params);
+                            if (maze.model == NULL) {
+                                std::cout << "Error: unable to load model" << std::endl;
+                                return 1;
+                            }
+
+                            // Reset the context
+                            maze.ctx_params.seed = 1234;
+                            maze.ctx_params.n_ctx = 2048;
+                            maze.ctx_params.n_threads = maze.params.n_threads;
+                            maze.ctx_params.n_threads_batch = maze.params.n_threads_batch == -1 ? maze.params.n_threads : maze.params.n_threads_batch;
+                            maze.ctx = llama_new_context_with_model(maze.model, maze.ctx_params);
+                            maze.check_ctx = llama_new_context_with_model(maze.model, maze.ctx_params);
+
+                            // Stop the win sound
+                            winSound.stop();
+
+                            if (maze.ctx == NULL) {
+                                std::cout << "Error: failed to create the llama_context" << std::endl;
+                                return 1;
+                            }
+                            if (maze.check_ctx == NULL) {
+                                std::cout << "Error: failed to create the llama_context" << std::endl;
+                                return 1;
+                            }
+                        }
+                        else if (exitBounds.contains(mousePosF.x, mousePosF.y)) {
+                            // Close the window
+                            window.clear();
+                            window.close();
+                        }
+                    }
+                    else if (maze.dialogueBoxState == 6) {
+                        sf::FloatRect playAgainBounds((viewSize.x - 250) / 2.0f, dialogueBoxPosition.y + 270, 100, 30);
+                        sf::FloatRect exitBounds((viewSize.x + 100) / 2.0f, dialogueBoxPosition.y + 270, 50, 30);
 
                         if (playAgainBounds.contains(mousePosF.x, mousePosF.y)) {
                             // Restart the game
@@ -1201,18 +1255,16 @@ int main() {
                             }
 
                             // Reset the context
-                            if (maze.ctx != NULL) {
-                                llama_free(maze.ctx);
-                            }
-                            if (maze.check_ctx != NULL) {
-                                llama_free(maze.check_ctx);
-                            }
                             maze.ctx_params.seed = 1234;
                             maze.ctx_params.n_ctx = 2048;
                             maze.ctx_params.n_threads = maze.params.n_threads;
                             maze.ctx_params.n_threads_batch = maze.params.n_threads_batch == -1 ? maze.params.n_threads : maze.params.n_threads_batch;
                             maze.ctx = llama_new_context_with_model(maze.model, maze.ctx_params);
                             maze.check_ctx = llama_new_context_with_model(maze.model, maze.ctx_params);
+
+                            // Stop the lose sound
+                            loseSound.stop();
+
                             if (maze.ctx == NULL) {
                                 std::cout << "Error: failed to create the llama_context" << std::endl;
                                 return 1;
@@ -1221,71 +1273,11 @@ int main() {
                                 std::cout << "Error: failed to create the llama_context" << std::endl;
                                 return 1;
                             }
-                            else if (exitBounds.contains(mousePosF.x, mousePosF.y)) {
-                                // Close the window
-                                window.clear();
-                                window.close();
-                            }
                         }
-                        else if (maze.dialogueBoxState == 6) {
-                            sf::FloatRect playAgainBounds((viewSize.x - 250) / 2.0f, dialogueBoxPosition.y + 270, 100, 30);
-                            sf::FloatRect exitBounds((viewSize.x + 100) / 2.0f, dialogueBoxPosition.y + 270, 50, 30);
-
-                            loseSound.play();
-
-                            if (playAgainBounds.contains(mousePosF.x, mousePosF.y)) {
-                                // Restart the game
-                                srand(static_cast<unsigned int>(std::time(0)));
-                                maze = Maze();
-
-                                // Search for the first .gguf file in the "model" directory
-                                std::string modelPath;
-                                for (const auto& entry : std::filesystem::directory_iterator("./model")) {
-                                    if (entry.path().extension() == ".gguf") {
-                                        modelPath = entry.path().string();
-                                        break;
-                                    }
-                                }
-
-                                if (modelPath.empty()) {
-                                    std::cout << "Error: no .gguf model file found in the 'model' directory" << std::endl;
-                                    return 1;
-                                }
-
-                                // Load the model
-                                maze.model = llama_load_model_from_file(modelPath.c_str(), model_params);
-                                if (maze.model == NULL) {
-                                    std::cout << "Error: unable to load model" << std::endl;
-                                    return 1;
-                                }
-
-                                // Reset the context
-                                if (maze.ctx != NULL) {
-                                    llama_free(maze.ctx);
-                                }
-                                if (maze.check_ctx != NULL) {
-                                    llama_free(maze.check_ctx);
-                                }
-                                maze.ctx_params.seed = 1234;
-                                maze.ctx_params.n_ctx = 2048;
-                                maze.ctx_params.n_threads = maze.params.n_threads;
-                                maze.ctx_params.n_threads_batch = maze.params.n_threads_batch == -1 ? maze.params.n_threads : maze.params.n_threads_batch;
-                                maze.ctx = llama_new_context_with_model(maze.model, maze.ctx_params);
-                                maze.check_ctx = llama_new_context_with_model(maze.model, maze.ctx_params);
-                                if (maze.ctx == NULL) {
-                                    std::cout << "Error: failed to create the llama_context" << std::endl;
-                                    return 1;
-                                }
-                                if (maze.check_ctx == NULL) {
-                                    std::cout << "Error: failed to create the llama_context" << std::endl;
-                                    return 1;
-                                }
-                            }
-                            else if (exitBounds.contains(mousePosF.x, mousePosF.y)) {
-                                // Close the window
-                                window.clear();
-                                window.close();
-                            }
+                        else if (exitBounds.contains(mousePosF.x, mousePosF.y)) {
+                            // Close the window
+                            window.clear();
+                            window.close();
                         }
                     }
                 }
@@ -1323,7 +1315,7 @@ int main() {
                         maze.isDoorThinking = false; // Set isDoorThinking back to false
                         maze.dialogueBoxState = 3;
                         maze.playerInput.clear();
-                    }   
+                    }
                 }
                 else {
                     if (!maze.getDialogueBoxDisplayed()) {
@@ -1359,6 +1351,5 @@ int main() {
         }
         window.display();
     }
-
     return 0;
-} 
+}
