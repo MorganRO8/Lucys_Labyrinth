@@ -33,6 +33,7 @@ private:
     sf::Texture youLoseTexture;
 
 public:
+    int triesRemaining = 3;
     sf::SoundBuffer doorInteractBuffer;
     sf::Sound doorInteractSound;
     sf::SoundBuffer stepBuffer;
@@ -72,7 +73,9 @@ public:
         professions1 = { "Mathematician", "Historian", "Geographer", "Botanist", "Chemist", "Physicist", "Astronomer", "Zoologist", "Paleontologist", "Marine Biologist", "Nutritionist", "Geneticist", "Microbiologist", "Environmental Scientist", "Pharmacist", "Pathologist", "Civil Engineer", "Computer Scientist", "Mechanical Engineer" };
         professions2 = { "Biologist", "Economist", "Geologist", "Statistician", "Archaeologist", "Oceanographer", "Urban Planner", "Public Health Specialist", "Forensic Scientist", "Software Developer", "Electrical Engineer", "Materials Scientist", "Hydrologist", "Actuary", "Toxicologist", "Agricultural Scientist", "Educational Researcher", "Market Research Analyst", "Financial Analyst", "Industrial Engineer" };
         professions3 = { "Literary Critic", "Psychologist", "Sociologist", "Anthropologist", "Linguist", "Art Historian", "Musicologist", "Performance Artist", "Journalist", "Playwright", "Novelist", "Poet", "Screenwriter", "Critic (Art, Film)", "Historian of Science", "Cognitive Scientist", "Behavioral Economist", "Social Worker", "Cultural Studies Scholar", "Religious Studies Scholar" };
-        professions4 = { "Philosopher", "Ethicist", "Theologian", "Cultural Critic", "Political Scientist", "Legal Scholar", "Political Analyst", "Diplomat", "Policy Maker", "Strategist (Military, Political)", "Civil Rights Activist", "Human Rights Lawyer", "International Relations Expert", "Social Philosopher", "Public Administrator", "Political Theorist" };
+        // easy mode: professions4 = { "Philosopher", "Ethicist", "Theologian", "Cultural Critic", "Political Scientist", "Legal Scholar", "Political Analyst", "Diplomat", "Policy Maker", "Strategist (Military, Political)", "Civil Rights Activist", "Human Rights Lawyer", "International Relations Expert", "Social Philosopher", "Public Administrator", "Political Theorist" };
+        // hard mode:
+        professions4 = { "Entomologist", "Endocrinologist", "Epidemiologist", "Herpetologist", "Ichthyologist", "Malacologist", "Mycologist", "Ornithologist", "Primatologist", "Acarologist", "Bryologist", "Lichenologist", "Nematologist", "Palynologist", "Phycologist", "Protistologist", "Speleologist", "Volcanologist", "Cytogeneticist", "Histopathologist" };
         professions5 = { "String Theorist", "Politician", "Quantum Physicist", "Metaphysician", "Existentialist", "Cosmologist", "Theoretical Physicist", "Philosopher of Mind", "Logician" };
         generateMaze();
         grid[playerRow][playerCol].first = PLAYER;
@@ -144,7 +147,7 @@ public:
         while (allWalls) {
             for (int col = 0; col < 15; col++) {
                 if (grid[row + 1][col].first == DOOR) {
-                    int unblockChance = rand() % 2;
+                    int unblockChance = rand() % 10;
                     if (unblockChance == 0) {
                         grid[row][col] = { EMPTY, {0, {"", {false, false}}} };
                     }
@@ -193,6 +196,11 @@ public:
     }
 
     std::string generateResponse(const std::string& profession, bool isLiar) {
+
+        if (triesRemaining < 1) {
+            return "You are out of tries!";
+        }
+        triesRemaining--;
 
         // Clean up
         check_ctx = llama_new_context_with_model(model, ctx_params);
@@ -408,9 +416,10 @@ public:
         dialogueText.setLineSpacing(1.2f);
 
         std::string profession = grid[doorRow][doorCol].second.second.first;
-        std::string dialogue = "Hi, I'm a door, but I'm also a " + profession + ".\n Ask me questions, to which I will either always lie, \n or always tell the truth. If you can guess if I always lie\n or tell the truth, I'll let you through!";
+        std::string dialogue = "Hi, I'm a door, but I'm also a " + profession + ".\n Ask me up to 3 questions, to which I will either always lie, \n or always tell the truth. If you can guess if I always lie\n or tell the truth, I'll let you through!";
 
         if (dialogueBoxState == 1) {
+            triesRemaining = 3;
             dialogueText.setString(dialogue);
             dialogueText.setPosition(dialogueBoxPosition.x + 100, dialogueBoxPosition.y + 125);
             window.draw(dialogueText);
